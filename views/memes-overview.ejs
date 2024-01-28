@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Memes Overview</title>
+        <!-- Bootstrap CSS and Custom Styles -->
+        <link href="/css/bootstrap.min.css" rel="stylesheet">
+        <link href="stylesheets/style.css" rel="stylesheet">
+    </head>
+    
+<body>
+          <!-- Include the navbar partial -->
+          <%- include('partials/navbar', { user: user }) %>
+          
+    <!-- Search input and button here -->
+    <div class="search-bar-container">
+        <input type="text" id="searchInput" class="form-control" placeholder="Search by name">
+        <button id="searchButton" class="btn btn-success">Search</button>
+        <button id="clearButton" class="btn btn-danger">Clear Search</button>
+    </div>
+    
+
+    <div id="memeDetailsContainer"></div>
+
+    <table class="table table-hover table-striped">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Image</th>
+                <th>Details</th>
+            </tr>
+        </thead>
+        <tbody id="memeTableBody">
+          <% memes.forEach(function(meme) { %>
+              <tr id="meme-row-<%= meme.id %>">
+                  <td><%= meme.id %></td>
+                  <td><%= meme.name %></td>
+                  <td><img src="<%= meme.url %>" alt="<%= meme.name %>" style="width: 20%; height: auto;"></td> <!-- Scaled down 20% of their original size while maintaining the aspect ratio. -->
+                  <td>
+                      <% if (user) { %>
+                          <a href="/meme-details/<%= meme.id %>" onclick="markMemeAsViewed('<%= meme.id %>');">View Details</a>
+                      <% } %>
+                  </td>
+              </tr>
+          <% }); %>
+      </tbody>
+    </table>
+
+    <script>
+        const currentServerSessionId = "<%= serverSessionId %>";
+      
+        document.addEventListener('DOMContentLoaded', () => {
+          const storedData = JSON.parse(localStorage.getItem('viewedMemesSession') || '{}');
+          const storedSessionId = storedData.sessionId;
+          const viewedMemes = storedData.viewedMemes || [];
+          console.log('Stored session ID:', storedSessionId);
+      
+          if (storedSessionId !== currentServerSessionId) {
+            // Clear viewed memes if session ID doesn't match
+            localStorage.removeItem('viewedMemesSession');
+            console.log('Cleared viewed memes due to session ID mismatch.');
+          } else {
+            // Update row colors for viewed memes
+            viewedMemes.forEach(id => {
+              const row = document.getElementById(`meme-row-${id}`);
+              if (row) {
+                row.style.backgroundColor = 'lightgray';
+                console.log('Updated row color for viewed meme with ID:', id);
+              }
+            });
+          }
+        });
+      
+        function markMemeAsViewed(id) {
+          const storedData = JSON.parse(localStorage.getItem('viewedMemesSession') || '{}');
+          const viewedMemes = new Set(storedData.viewedMemes || []);
+          viewedMemes.add(id);
+          console.log('Marked meme as viewed with ID:', id);
+      
+          const newData = {
+            sessionId: currentServerSessionId,
+            viewedMemes: [...viewedMemes]
+          };
+      
+          localStorage.setItem('viewedMemesSession', JSON.stringify(newData));
+      
+          const row = document.getElementById(`meme-row-${id}`);
+          if (row) {
+            row.style.backgroundColor = 'lightgray';
+            console.log('Updated row color for viewed meme with ID:', id);
+          }
+        }
+
+        // Search functionality
+        const searchInput = document.getElementById('searchInput');
+        const searchButton = document.getElementById('searchButton');
+        const clearButton = document.getElementById('clearButton');
+        const memeTableBody = document.getElementById('memeTableBody');
+
+        searchButton.addEventListener('click', () => {
+            const searchTerm = searchInput.value.trim();
+            console.log('Search button clicked with search term:', searchTerm);
+
+            // Make an AJAX request to the server with the search term
+            fetch(`/search?searchTerm=${encodeURIComponent(searchTerm)}`)
+                .then((response) => {
+                    console.log('Fetch response received:', response);
+                    return response.json();
+                })
+                .then((data) => {
+                    console.log('Search results data received:', data);
+
+                    // Clear the current table content
+                    memeTableBody.innerHTML = '';
+
+                    if (searchTerm === '') {
+                        // If the search term is empty, repopulate the table with the original 20 memes
+                        data.memes = global.memeCache;
+                    }
+
+                    // Check if there are search results
+                    if (data && data.memes && data.memes.length > 0) {
+                        // Populate the table with search results or original memes
+                        data.memes.forEach((meme) => {
+                            const row = document.createElement('tr');
+                            row.id = `meme-row-${meme.id}`;
+                            row.innerHTML = `
+                                <td>${meme.id}</td>
+                                <td>${meme.name}</td>
+                                <td><img src="${meme.url}" alt="${meme.name}" style="width: 100px; height: auto;"></td>
+                                <td><a href="/meme-details/${meme.id}" onclick="markMemeAsViewed('${meme.id}');">View Details</a></td>
+                            `;
+                            memeTableBody.appendChild(row);
+                        });
+                    } else {
+                        // Displays a message when no search results are found
+                        memeTableBody.innerHTML = '<tr><td colspan="4">No matching memes found.</td></tr>';
+                    }
+                })
+                .catch((error) => {
+                    console.error('Error fetching search results:', error);
+                });
+        });
+
+        <!-- Clear search functionality -->
+clearButton.addEventListener('click', () => {
+    // Clear the search input field
+    searchInput.value = '';
+
+    // Reload the page to display the original 20 memes
+    location.reload();
+});
+
+    </script>
+    <script src="js/memedetails.js"></script>
+</body>
+</html>
